@@ -179,7 +179,7 @@ else version (linux)
         int __libc_current_sigrtmax();
     }
 
-    @property int SIGRTMIN() nothrow @nogc {
+    @property int SIGRTMIN() nothrow @nogc @system {
         __gshared static int sig = -1;
         if (sig == -1) {
             sig = __libc_current_sigrtmin();
@@ -187,7 +187,7 @@ else version (linux)
         return sig;
     }
 
-    @property int SIGRTMAX() nothrow @nogc {
+    @property int SIGRTMAX() nothrow @nogc @system {
         __gshared static int sig = -1;
         if (sig == -1) {
             sig = __libc_current_sigrtmax();

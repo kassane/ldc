@@ -221,7 +221,7 @@ struct ExceptionHeader
     /*************************
      * Push this onto stack of chained exceptions.
      */
-    void push()
+    void push() @system
     {
         next = stack;
         stack = &this;
@@ -245,7 +245,7 @@ struct ExceptionHeader
      * Returns:
      *  pointer to ExceptionHeader that eo points into.
      */
-    static ExceptionHeader* toExceptionHeader(_Unwind_Exception* eo)
+    static ExceptionHeader* toExceptionHeader(_Unwind_Exception* eo) @system
     {
         return cast(ExceptionHeader*)(cast(void*)eo - ExceptionHeader.exception_object.offsetof);
     }
@@ -541,7 +541,7 @@ else
 // LDC: generalized from __dmd_personality_v0
 extern (C) _Unwind_Reason_Code _d_eh_personality_common(_Unwind_Action actions,
                _Unwind_Exception_Class exceptionClass, _Unwind_Exception* exceptionObject,
-               _Unwind_Context* context)
+               _Unwind_Context* context) @system
 {
     version (LDC) {} else
     {
@@ -771,7 +771,7 @@ ClassInfo getClassInfo(_Unwind_Exception* exceptionObject, const(ubyte)* current
  * See_Also:
  *      https://en.wikipedia.org/wiki/LEB128
  */
-_uleb128_t uLEB128(const(ubyte)** p)
+_uleb128_t uLEB128(const(ubyte)** p) @system
 {
     auto q = *p;
     _uleb128_t result = 0;
@@ -798,7 +798,7 @@ _uleb128_t uLEB128(const(ubyte)** p)
  * See_Also:
  *      https://en.wikipedia.org/wiki/LEB128
  */
-_sleb128_t sLEB128(const(ubyte)** p)
+_sleb128_t sLEB128(const(ubyte)** p) @system
 {
     auto q = *p;
     ubyte b;
@@ -872,7 +872,7 @@ LsdaResult scanLSDA(const(ubyte)* lsda, _Unwind_Ptr ip, _Unwind_Exception_Class 
         bool cleanupsOnly,
         bool preferHandler,
         _Unwind_Exception* exceptionObject,
-        out _Unwind_Ptr landingPad, out int handler)
+        out _Unwind_Ptr landingPad, out int handler) @system
 {
     auto p = lsda;
     if (!p)
@@ -1131,7 +1131,7 @@ LsdaResult scanLSDA(const(ubyte)* lsda, _Unwind_Ptr ip, _Unwind_Exception_Class 
  *      - &lt;0 means corrupt
  */
 int actionTableLookup(_Unwind_Exception* exceptionObject, uint actionRecordPtr, const(ubyte)* pActionTable,
-                      const(ubyte)* tt, ubyte TType, _Unwind_Exception_Class exceptionClass, const(ubyte)* lsda)
+                      const(ubyte)* tt, ubyte TType, _Unwind_Exception_Class exceptionClass, const(ubyte)* lsda) @system
 {
     debug (EH_personality)
     {
@@ -1279,7 +1279,7 @@ version (CppRuntime_GNU)
      * Returns:
      *      null if not caught, pointer to thrown object if caught
      */
-    void* getCppPtrToThrownObject(_Unwind_Exception* exceptionObject, CppTypeInfo sti)
+    void* getCppPtrToThrownObject(_Unwind_Exception* exceptionObject, CppTypeInfo sti) @system
     {
         void* p;    // pointer to thrown object
         if (exceptionObject.exception_class & 1)
@@ -1350,7 +1350,7 @@ version (CppRuntime_GNU)
          * Returns:
          *  pointer to CppExceptionHeader that eo points into.
          */
-        static CppExceptionHeader* toExceptionHeader(_Unwind_Exception* eo)
+        static CppExceptionHeader* toExceptionHeader(_Unwind_Exception* eo) @system
         {
             return cast(CppExceptionHeader*)(eo + 1) - 1;
         }

@@ -203,7 +203,7 @@ extern(C) int sympair_cmp(scope const void* e1, scope const void* e2) nothrow @n
 // Place symbol s, and then place any fan ins or fan outs with
 // counts greater than count.
 
-private void trace_place(FILE* fpdef, Symbol* s, ulong count)
+private void trace_place(FILE* fpdef, Symbol* s, ulong count) @system
 {
     if (!(s.Sflags & SFvisited))
     {
@@ -762,7 +762,7 @@ char[] trace_readline(FILE* fp)
 //////////////////////////////////////
 // Skip space
 
-private char *skipspace(char *p)
+private char *skipspace(char *p) @system
 {
     while (isspace(*p))
         p++;
@@ -772,7 +772,7 @@ private char *skipspace(char *p)
 ////////////////////////////////////////////////////////
 // Merge in profiling data from existing file.
 
-private void trace_merge(Symbol** proot)
+private void trace_merge(Symbol** proot) @system
 {
     // We're outputting to stdout
     if (!trace_logfilename.length)

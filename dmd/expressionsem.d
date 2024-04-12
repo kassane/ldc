@@ -9275,8 +9275,7 @@ version (IN_LLVM)
         string msg;
         if (!isSafeCast(ex, t1b, tob, msg))
         {
-            if (sc.setUnsafe(false, exp.loc,
-                "cast from `%s` to `%s` not allowed in safe code", exp.e1.type, exp.to))
+            if (sc.setUnsafe(false, exp.loc, "cast from `%s` to `%s` not allowed in safe code", exp.e1.type, exp.to))
             {
                 if (msg.length)
                     errorSupplemental(exp.loc, "%s", (msg ~ '\0').ptr);

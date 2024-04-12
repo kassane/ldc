@@ -14,6 +14,8 @@ import core.stdc.string;
 import core.stdc.stdlib;
 import core.exception : onOutOfMemoryError;
 
+@system:
+
 // use version gcbitsSingleBitOperation to disable optimizations that use
 //  word operands on bulk operation copyRange, setRange, clrRange, etc.
 // version = gcbitsSingleBitOperation;

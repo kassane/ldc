@@ -29,7 +29,7 @@ debug(PRINTF)
  *      t = Throwable
  */
 
-nothrow extern (C) void _d_delThrowable(Throwable t)
+nothrow extern (C) void _d_delThrowable(Throwable t) @system
 {
     if (t)
     {

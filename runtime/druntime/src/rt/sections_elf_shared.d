@@ -254,7 +254,7 @@ version (Shared)
         // cleanupLoadedLibraries().
     }
 
-    void scanTLSRanges(Array!(ThreadDSO)* tdsos, scope ScanDG dg) nothrow
+    void scanTLSRanges(Array!(ThreadDSO)* tdsos, scope ScanDG dg) nothrow @system
     {
         foreach (ref tdso; *tdsos)
             dg(tdso._tlsRange.ptr, tdso._tlsRange.ptr + tdso._tlsRange.length);
@@ -358,7 +358,7 @@ else
     /***
      * Called once per thread; returns array of thread local storage ranges
      */
-    Array!(void[])* initTLSRanges() nothrow @nogc
+    Array!(void[])* initTLSRanges() nothrow @nogc @system
     {
         auto rngs = &_tlsRanges();
         if (rngs.empty)
@@ -369,13 +369,13 @@ else
         return rngs;
     }
 
-    void finiTLSRanges(Array!(void[])* rngs) nothrow @nogc
+    void finiTLSRanges(Array!(void[])* rngs) nothrow @nogc @system
     {
         rngs.reset();
         .free(rngs);
     }
 
-    void scanTLSRanges(Array!(void[])* rngs, scope ScanDG dg) nothrow
+    void scanTLSRanges(Array!(void[])* rngs, scope ScanDG dg) nothrow @system
     {
         foreach (rng; *rngs)
             dg(rng.ptr, rng.ptr + rng.length);
@@ -440,7 +440,7 @@ version (Shared)
      * to the corresponding DSO*, protected by a mutex.
      */
     __gshared Mutex _handleToDSOMutex;
-    @property ref HashTab!(void*, DSO*) _handleToDSO() @nogc nothrow { __gshared HashTab!(void*, DSO*) x; return x; }
+    @property ref HashTab!(void*, DSO*) _handleToDSO() @nogc nothrow @system { __gshared HashTab!(void*, DSO*) x; return x; }
     //__gshared HashTab!(void*, DSO*) _handleToDSO;
 }
 else
@@ -449,7 +449,7 @@ else
      * Static DSOs loaded by the runtime linker. This includes the
      * executable. These can't be unloaded.
      */
-    @property ref Array!(DSO*) _loadedDSOs() @nogc nothrow { __gshared Array!(DSO*) x; return x; }
+    @property ref Array!(DSO*) _loadedDSOs() @nogc nothrow @system { __gshared Array!(DSO*) x; return x; }
     //__gshared Array!(DSO*) _loadedDSOs;
 
     /*
@@ -522,7 +522,7 @@ T[] toRange(T)(T* beg, T* end) { return beg[0 .. end - beg]; }
  * A pointer to that code is inserted into both the .init_array and .fini_array
  * segment so it gets called by the loader on startup and shutdown.
  */
-package extern(C) void _d_dso_registry(void* arg)
+package extern(C) void _d_dso_registry(void* arg) @system
 {
     auto data = cast(CompilerDSOData*) arg;
 
@@ -864,7 +864,7 @@ version (Shared)
 {
 @nogc nothrow:
     version (Windows) {} else
-    const(char)* nameForDSO(in DSO* pdso)
+    const(char)* nameForDSO(in DSO* pdso) @system
     {
         Dl_info info = void;
         const success = dladdr(pdso._slot, &info) != 0;
@@ -898,7 +898,7 @@ version (Shared)
         _handleToDSOMutex.unlock_nothrow();
     }
 
-    static if (SharedELF) void getDependencies(const scope ref SharedObject object, ref Array!(DSO*) deps)
+    static if (SharedELF) void getDependencies(const scope ref SharedObject object, ref Array!(DSO*) deps) @system
     {
         // get the entries of the .dynamic section
         ElfW!"Dyn"[] dyns;
@@ -1094,7 +1094,7 @@ else
  * Returns:
  *      the dlopen handle for that DSO or null if addr is not within a loaded DSO
  */
-version (Shared) void* handleForAddr(void* addr) nothrow @nogc
+version (Shared) void* handleForAddr(void* addr) nothrow @nogc @system
 {
     version (Windows)
     {
@@ -1232,7 +1232,7 @@ version (LDC)
 }
 
 // LDC: added `alignment` param
-void[] getTLSRange(size_t mod, size_t sz, size_t alignment) nothrow @nogc
+void[] getTLSRange(size_t mod, size_t sz, size_t alignment) nothrow @nogc @system
 {
     version (Static_Linux_X86_Any)
     {
