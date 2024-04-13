@@ -192,7 +192,7 @@ private
     import core.exception : onOutOfMemoryError;
     import core.stdc.stdlib : abort;
 
-    extern (C) void fiber_entryPoint() nothrow /* LDC */ @assumeUsed
+    extern (C) void fiber_entryPoint() nothrow /* LDC */ @assumeUsed @system
     {
         Fiber   obj = Fiber.getThis();
         assert( obj );
@@ -859,7 +859,7 @@ class Fiber
     /**
      * Cleans up any remaining resources used by this object.
      */
-    ~this() nothrow @nogc
+    ~this() nothrow @nogc @system
     {
         // NOTE: A live reference to this object will exist on its associated
         //       stack from the first time its call() method has been called
@@ -1209,7 +1209,7 @@ private:
     //
     // Allocate a new stack for this fiber.
     //
-    final void allocStack( size_t sz, size_t guardPageSize ) nothrow
+    final void allocStack( size_t sz, size_t guardPageSize ) nothrow @system
     in
     {
         assert( !m_pmem && !m_ctxt );
@@ -1961,7 +1961,7 @@ private:
     //
     // Switches into the stack held by this fiber.
     //
-    final void switchIn() nothrow @nogc
+    final void switchIn() nothrow @nogc @system
     {
         // see note in getThis()
         version (LDC) pragma(inline, false);

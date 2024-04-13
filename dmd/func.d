@@ -1182,6 +1182,11 @@ version (IN_LLVM)
         return bitFields;
     }
 
+    final bool isSystem()
+    {
+        return type.toTypeFunction().trust == TRUST.system;
+    }
+    
     final bool isSafe()
     {
         if (safetyInprocess)
@@ -1201,6 +1206,13 @@ version (IN_LLVM)
         return type.toTypeFunction().trust == TRUST.trusted;
     }
 
+    extern (D) final bool setUnsafe(
+        bool gag, Loc loc, const(char)* fmt,
+        bool checkedByDefault)
+    {
+        return setUnsafe(gag, loc, fmt, null, null, null, checkedByDefault);
+    }
+
     /**************************************
      * The function is doing something unsafe, so mark it as unsafe.
      *
@@ -1215,7 +1227,8 @@ version (IN_LLVM)
      */
     extern (D) final bool setUnsafe(
         bool gag = false, Loc loc = Loc.init, const(char)* fmt = null,
-        RootObject arg0 = null, RootObject arg1 = null, RootObject arg2 = null)
+        RootObject arg0 = null, RootObject arg1 = null, RootObject arg2 = null,
+        bool checkedByDefault = true)
     {
         if (safetyInprocess)
         {
@@ -1226,6 +1239,13 @@ version (IN_LLVM)
 
             if (fes)
                 fes.func.setUnsafe();
+        }
+        else if (checkedByDefault && !isSystem() && !isTrusted())
+        {
+            if (!gag && fmt)
+                .deprecation(loc, fmt, arg0 ? arg0.toChars() : "", arg1 ? arg1.toChars() : "", arg2 ? arg2.toChars() : "");
+
+            return false;
         }
         else if (isSafe())
         {
@@ -3738,7 +3758,8 @@ bool isRootTraitsCompilesScope(Scope* sc)
  */
 bool setUnsafe(Scope* sc,
     bool gag = false, Loc loc = Loc.init, const(char)* fmt = null,
-    RootObject arg0 = null, RootObject arg1 = null, RootObject arg2 = null)
+    RootObject arg0 = null, RootObject arg1 = null, RootObject arg2 = null,
+    bool checkedByDefault = true)
 {
     if (sc.intypeof)
         return false; // typeof(cast(int*)0) is safe
@@ -3777,7 +3798,14 @@ bool setUnsafe(Scope* sc,
         return false;
     }
 
-    return sc.func.setUnsafe(gag, loc, fmt, arg0, arg1, arg2);
+    return sc.func.setUnsafe(gag, loc, fmt, arg0, arg1, arg2, !(sc.flags & SCOPE.Cfile) && checkedByDefault);
+}
+
+bool setUnsafe(Scope* sc,
+    bool gag, Loc loc, const(char)* fmt,
+    bool checkedByDefault)
+{
+    return setUnsafe(sc, gag, loc, fmt, null, null, null, checkedByDefault);
 }
 
 /***************************************
@@ -3802,7 +3830,8 @@ bool setUnsafe(Scope* sc,
  * Returns: whether an actual safe error (not deprecation) occured
  */
 bool setUnsafePreview(Scope* sc, FeatureState fs, bool gag, Loc loc, const(char)* msg,
-    RootObject arg0 = null, RootObject arg1 = null, RootObject arg2 = null)
+    RootObject arg0 = null, RootObject arg1 = null, RootObject arg2 = null,
+    bool checkedByDefault = false)
 {
     //printf("setUnsafePreview() fs:%d %s\n", fs, msg);
     with (FeatureState) final switch (fs)
@@ -3811,7 +3840,7 @@ bool setUnsafePreview(Scope* sc, FeatureState fs, bool gag, Loc loc, const(char)
         return false;
 
       case enabled:
-        return sc.setUnsafe(gag, loc, msg, arg0, arg1, arg2);
+        return sc.setUnsafe(gag, loc, msg, arg0, arg1, arg2, checkedByDefault);
 
       case default_:
         if (!sc.func)

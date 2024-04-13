@@ -673,7 +673,7 @@ package(core.thread):
     // Global Thread List Operations
     ///////////////////////////////////////////////////////////////////////////
 
-    package static void incrementAboutToStart(ThreadBase t) nothrow @nogc
+    package static void incrementAboutToStart(ThreadBase t) nothrow @nogc @system
     {
         ++nAboutToStart;
         pAboutToStart = cast(ThreadBase*)realloc(pAboutToStart, ThreadBase.sizeof * nAboutToStart);
@@ -683,7 +683,7 @@ package(core.thread):
     //
     // Add a thread to the global thread list.
     //
-    static void add(ThreadBase t, bool rmAboutToStart = true) nothrow @nogc
+    static void add(ThreadBase t, bool rmAboutToStart = true) nothrow @nogc @system
     in
     {
         assert(t);
@@ -1065,7 +1065,7 @@ do
 package alias callWithStackShellDg = void delegate(void* sp) nothrow;
 private alias callWithStackShell = externDFunc!("core.thread.osthread.callWithStackShell", void function(scope callWithStackShellDg) nothrow);
 
-private void scanAllTypeImpl(scope ScanAllThreadsTypeFn scan, void* curStackTop) nothrow
+private void scanAllTypeImpl(scope ScanAllThreadsTypeFn scan, void* curStackTop) nothrow @system
 {
     ThreadBase  thisThread  = null;
     void*   oldStackTop = null;
@@ -1141,7 +1141,7 @@ version (SupportSanitizers)
 {
 import ldc.attributes;
 @noSanitize("address") // This function scans the stack including redzones.
-private void scanStackForASanFakeStack(scope ScanAllThreadsTypeFn scan, void* fakestack, void* stackLowAddress, void* stackHighAddress) nothrow
+private void scanStackForASanFakeStack(scope ScanAllThreadsTypeFn scan, void* fakestack, void* stackLowAddress, void* stackHighAddress) nothrow @system
 {
     /+
     When ASan fakestack is enabled (when Use After Return detection is enabled), function-local variables are stored on the heap,
@@ -1292,7 +1292,7 @@ do
 * Throws:
 *  ThreadError.
 */
-package void onThreadError(string msg) nothrow @nogc
+package void onThreadError(string msg) nothrow @nogc @system
 {
     __gshared ThreadError error = new ThreadError(null);
     error.msg = msg;
@@ -1421,7 +1421,7 @@ package
         lowlevelLock.__dtor();
     }
 
-    void ll_removeThread(ThreadID tid) nothrow @nogc
+    void ll_removeThread(ThreadID tid) nothrow @nogc @system
     {
         lowlevelLock.lock_nothrow();
         scope(exit) lowlevelLock.unlock_nothrow();
@@ -1448,7 +1448,7 @@ package
  *
  * Returns: `true` if the thread was created by `createLowLevelThread` and is still running.
  */
-bool findLowLevelThread(ThreadID tid) nothrow @nogc
+bool findLowLevelThread(ThreadID tid) nothrow @nogc @system
 {
     lowlevelLock.lock_nothrow();
     scope(exit) lowlevelLock.unlock_nothrow();

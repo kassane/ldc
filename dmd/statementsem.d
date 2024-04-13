@@ -3629,7 +3629,7 @@ version (IN_LLVM)
             deprecation(cas.loc, "`asm` statement cannot be marked `@safe`, use `@system` or `@trusted` instead");
         if (!(cas.stc & (STC.trusted | STC.safe)))
         {
-            sc.setUnsafe(false, cas.loc, "`asm` statement is assumed to be `@system` - mark it with `@trusted` if it is not");
+            sc.setUnsafe(false, cas.loc, "`asm` statement is assumed to be `@system` - mark it with `@trusted` if it is not", false);
         }
 
         sc.pop();

@@ -434,7 +434,7 @@ class Thread : ThreadBase
      * Throws:
      *  ThreadException if the thread fails to start.
      */
-    final Thread start() nothrow
+    final Thread start() nothrow @system
     in
     {
         assert( !next && !prev );
@@ -792,7 +792,7 @@ class Thread : ThreadBase
      * Returns:
      *  The scheduling priority of this thread.
      */
-    final @property int priority()
+    final @property int priority() @system
     {
         version (Windows)
         {
@@ -980,7 +980,7 @@ class Thread : ThreadBase
      *
      * ------------------------------------------------------------------------
      */
-    static void sleep( Duration val ) @nogc nothrow
+    static void sleep( Duration val ) @nogc nothrow @system
     in
     {
         assert( !val.isNegative );
@@ -1432,7 +1432,7 @@ version (Windows)
 
 
 // Calls the given delegate, passing the current thread's stack pointer to it.
-package extern(D) void callWithStackShell(scope callWithStackShellDg fn) nothrow
+package extern(D) void callWithStackShell(scope callWithStackShellDg fn) nothrow @system
 in (fn)
 {
     // The purpose of the 'shell' is to ensure all the registers get
@@ -1641,7 +1641,7 @@ in (fn)
 }
 
 version (Windows)
-private extern (D) void scanWindowsOnly(scope ScanAllThreadsTypeFn scan, ThreadBase _t) nothrow
+private extern (D) void scanWindowsOnly(scope ScanAllThreadsTypeFn scan, ThreadBase _t) nothrow @system
 {
     auto t = _t.toThread;
 
@@ -1759,7 +1759,7 @@ version (LDC_Windows)
     }
 }
 else
-private extern(D) void* getStackBottom() nothrow @nogc
+private extern(D) void* getStackBottom() nothrow @nogc @system
 {
     version (Windows)
     {
@@ -2221,7 +2221,7 @@ private extern (D) void resume(ThreadBase _t) nothrow @nogc
  * garbage collector on startup and before any other thread routines
  * are called.
  */
-extern (C) void thread_init() @nogc nothrow
+extern (C) void thread_init() @nogc nothrow @system
 {
     // NOTE: If thread_init itself performs any allocations then the thread
     //       routines reserved for garbage collector use may be called while
@@ -2342,7 +2342,7 @@ version (Windows)
         //
         // Entry point for Windows threads
         //
-        extern (Windows) uint thread_entryPoint( void* arg ) nothrow
+        extern (Windows) uint thread_entryPoint( void* arg ) nothrow @system
         {
             version (Shared)
             {
@@ -2454,7 +2454,7 @@ else version (Posix)
         //
         // Entry point for POSIX threads
         //
-        extern (C) void* thread_entryPoint( void* arg ) nothrow
+        extern (C) void* thread_entryPoint( void* arg ) nothrow @system
         {
             version (Shared)
             {
@@ -2741,7 +2741,7 @@ private
     __gshared HMODULE ll_dllModule;
     __gshared ThreadID ll_dllMonitorThread;
 
-    int ll_countLowLevelThreadsWithDLLUnloadCallback() nothrow
+    int ll_countLowLevelThreadsWithDLLUnloadCallback() nothrow @system
     {
         lowlevelLock.lock_nothrow();
         scope(exit) lowlevelLock.unlock_nothrow();
@@ -2764,7 +2764,7 @@ private
         return refcnt > internalReferences;
     }
 
-    private void monitorDLLRefCnt() nothrow
+    private void monitorDLLRefCnt() nothrow @system
     {
         // this thread keeps the DLL alive until all external references are gone
         while (ll_dllHasExternalReferences())
@@ -2852,7 +2852,7 @@ private
  *  is returned.
  */
 ThreadID createLowLevelThread(void delegate() nothrow dg, uint stacksize = 0,
-                              void delegate() nothrow cbDllUnload = null) nothrow @nogc
+                              void delegate() nothrow cbDllUnload = null) nothrow @nogc @system
 {
     void delegate() nothrow* context = cast(void delegate() nothrow*)malloc(dg.sizeof);
     *context = dg;

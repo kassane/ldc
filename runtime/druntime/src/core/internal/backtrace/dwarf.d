@@ -238,7 +238,7 @@ struct TraceInfoBuffer
 }
 
 private:
-
+@system
 int processCallstack(Location[] locations, const(ubyte)[] debugLineSectionData,
                      size_t baseAddress, scope int delegate(ref size_t, ref const(char[])) dg)
 {
@@ -362,7 +362,7 @@ version (Darwin) {
         close(write_to_atos);
         close(read_from_atos);
     }
-    private Location parseAtosLine(char* buffer) @nogc nothrow
+    private Location parseAtosLine(char* buffer) @nogc nothrow @system
     {
         // The line from `atos` is in one of these formats:
         // myfunction (in library.dylib) (sourcefile.c:17)
@@ -551,7 +551,7 @@ alias RunStateMachineCallback =
  * Returns:
  *   `false` if an error happened (e.g. unknown opcode)
  */
-bool runStateMachine(ref const(LineNumberProgram) lp, scope RunStateMachineCallback callback) @nogc nothrow
+bool runStateMachine(ref const(LineNumberProgram) lp, scope RunStateMachineCallback callback) @nogc nothrow @system
 {
     StateMachine machine;
     machine.isStatement = lp.defaultIsStatement;
