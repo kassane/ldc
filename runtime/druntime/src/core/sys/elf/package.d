@@ -343,6 +343,8 @@ enum EM_LOONGARCH =   258;
 
 enum EM_ALPHA =        0x9026;
 
+enum EM_MOS =         6502;
+
 enum EV_NONE =         0;
 enum EV_CURRENT =      1;
 enum EV_NUM =          2;
