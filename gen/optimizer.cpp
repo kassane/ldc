@@ -478,7 +478,7 @@ void runOptimizationPasses(llvm::Module *M) {
 
   if (optLevelVal == 0) {
     mpm = pb.buildO0DefaultPipeline(level, opts::isUsingLTO());
-#if LDC_LLVM_VER >= 1700
+#if LDC_LLVM_VER > 1800
   } else if (opts::ltoFatObjects && opts::isUsingLTO()) {
     mpm = pb.buildFatLTODefaultPipeline(level,
                                         opts::isUsingThinLTO(),

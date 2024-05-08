@@ -705,6 +705,7 @@ extern (C++) final class VersionCondition : DVCondition
             case "MIPS_O32":
             case "MIPS_O64":
             case "MIPS_SoftFloat":
+            case "MOS6502":
             case "MSP430":
             case "NetBSD":
             case "none":

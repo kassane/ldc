@@ -719,6 +719,9 @@ void registerPredefinedTargetVersions() {
     registerPredefinedFloatABI("MIPS_SoftFloat", "MIPS_HardFloat");
     registerMipsABI();
     break;
+  case llvm::Triple::mos:
+    VersionCondition::addPredefinedGlobalIdent("MOS6502");
+    break;
   case llvm::Triple::msp430:
     VersionCondition::addPredefinedGlobalIdent("MSP430");
     break;
