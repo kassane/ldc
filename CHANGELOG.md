@@ -1,10 +1,12 @@
 # LDC master
 
 #### Big news
+- Android: NDK for prebuilt package bumped from r26d to r27. (#4711)
 
 #### Platform support
 
 #### Bug fixes
+- Fix potentially corrupt IR layouts for bit fields. (#4646, #4708)
 
 # LDC 1.39.0 (2024-07-04)
 
