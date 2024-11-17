@@ -1,5 +1,10 @@
 module core.internal.gc.impl.sdc.gc;
 
+version (linux):
+version (CRuntime_Glibc):
+version (Shared):
+version (X86_64):
+
 import core.gc.gcinterface;
 static import core.memory;
 import core.stdc.string : memcpy, memset, memmove;

@@ -1,3 +1,7 @@
 [submodule "phobos"]
 	path = runtime/phobos
 	url = https://github.com/ldc-developers/phobos.git
+[submodule "runtime/sdc"]
+	path = runtime/sdc
+	url = https://github.com/schveiguy/sdc
+	branch = dmdbuild

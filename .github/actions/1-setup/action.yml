@@ -170,3 +170,19 @@ runs:
         echo "CFLAGS=-m32" >> $GITHUB_ENV
         echo "CXXFLAGS=-m32" >> $GITHUB_ENV
         echo "ASMFLAGS=-m32" >> $GITHUB_ENV
+
+    - name: 'Linux: Build SDC libdmdalloc.a'
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        set -euxo pipefail
+
+        export DEBIAN_FRONTEND=noninteractive
+        wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+        echo 'deb http://apt.llvm.org/focal/ llvm-toolchain-focal-19 main' | sudo tee /etc/apt/sources.list.d/llvm.list
+        sudo apt-get -qq update
+        sudo apt-get install -qq llvm-19-dev lld-19 nasm
+        sudo ln -s lld-19 /usr/bin/ld.lld # so that the SDC Makefile detects it
+
+        LLVM_CONFIG=llvm-config-19 DMD=ldmd2 SDFLAGS=-O3 make -C runtime/sdc -j$(nproc) lib/libdmdalloc.a
+        ls -l runtime/sdc/lib/libdmdalloc.a

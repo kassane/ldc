@@ -651,6 +651,10 @@ macro(build_runtime_libs druntime_o druntime_bc phobos2_o phobos2_bc c_flags ld_
     # C executables.
     if("${is_shared}" STREQUAL "ON")
         target_link_libraries(druntime-ldc${target_suffix} ${C_SYSTEM_LIBS_SHARED})
+
+        if((NOT CMAKE_CROSSCOMPILING) AND ("${TARGET_SYSTEM}" MATCHES "Linux") AND ("${path_suffix}" STREQUAL "${LIB_SUFFIX}"))
+            target_link_libraries(druntime-ldc${target_suffix} ${CMAKE_CURRENT_SOURCE_DIR}/sdc/lib/libdmdalloc.a)
+        endif()
     endif()
 
     list(APPEND ${outlist_targets} druntime-ldc${target_suffix})

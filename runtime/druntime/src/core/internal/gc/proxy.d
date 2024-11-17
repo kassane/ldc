@@ -14,6 +14,8 @@ import core.gc.registry : createGCInstance;
 
 static import core.memory;
 
+version (linux) version (CRuntime_Glibc) version (Shared) version (X86_64) version = With_SDC;
+
 private
 {
     static import core.memory;
@@ -49,10 +51,17 @@ extern (C)
         // avoid being optimized away
         auto reg1 = &_d_register_conservative_gc;
         auto reg2 = &_d_register_manual_gc;
-        auto reg3 = &_d_register_sdc_gc;
-        auto reg4 = &thread_scanAll_C;
-        auto reg5 = &__sd_gc_finalize;
-        return reg1 < reg2 ? reg1 : reg2 < reg3 ? reg2 : reg3 < reg4 ? reg3 : reg4 < reg5 ? reg4 : reg5;
+        version (With_SDC)
+        {
+            auto reg3 = &_d_register_sdc_gc;
+            auto reg4 = &thread_scanAll_C;
+            auto reg5 = &__sd_gc_finalize;
+            return reg1 < reg2 ? reg1 : reg2 < reg3 ? reg2 : reg3 < reg4 ? reg3 : reg4 < reg5 ? reg4 : reg5;
+        }
+        else
+        {
+            return reg1 < reg2 ? reg1 : reg2;
+        }
     }
 
     void gc_init()
