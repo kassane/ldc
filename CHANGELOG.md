@@ -1,17 +1,20 @@
 # LDC master
 
 #### Big news
+- Latest frontend and druntime patches from DMD stable (v2.110.0-rc.1+). (#4854)
 - LLVM for prebuilt packages bumped to v19.1.7. (#4822)
 - New prebuilt package for Alpine Linux x86_64 with musl libc. It's currently generated on Alpine v3.20, using its default LLVM 17. Most bundled executables are fully static and can be run on ~all distros. (#4826)
 - Revived dynamic-compile (JIT) functionality (formerly unsupported since LLVM 12), supporting LLVM 18+ now. (#4774)
 - ldc2.conf: `%%ldcversion%%` placeholder added, allowing to refer to version-specific directories.
+- Windows: The prebuilt packages now bundle an official libcurl build (from https://curl.se/windows/), currently v8.12.1. The static library (`curl_a.lib`) isn't available anymore. (#4855)
 
 #### Platform support
 - Supports LLVM 15 - 19.
 - Initial compiler and runtime support for ppc64 and ppc64le systems that use IEEE 754R 128-bit floating-point as the default 128-bit floating-point format. (#4833)
-- Added support for building for Windows on ARM64. Use option '-march=arm64' to compile, 'ldc-build-runtime.exe --dFlags -march=arm64' to build the runtime libraries. (#4835)
+- Initial support for Windows on ARM64. The prebuilt Windows multilib package/installer bundles prebuilt arm64 druntime and Phobos; cross-compiling works out of the box via `-mtriple=aarch64-windows-msvc`, but you currently need to set up a suited MSVC arm64 build environment before yourself (e.g., by running `vsdevcmd.bat -arch=arm64 -host_arch=x64`). (#4835, #4846)
 
 #### Bug fixes
+- Prebuilt macOS universal package: Fix automatic bundled `libLTO.dylib` usage when linking with LTO. (#4857)
 - Building multi-file D applications with control-flow protection will no longer cause LDC to throw an internal compiler error. (#4828)
 
 # LDC 1.40.0 (2024-12-15)
