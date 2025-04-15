@@ -29,6 +29,10 @@ struct PPC64LETargetABI : TargetABI {
 
   explicit PPC64LETargetABI() : hfvaToArray(8) {}
 
+  llvm::UWTableKind defaultUnwindTableKind() override {
+    return llvm::UWTableKind::Async;
+  }
+
   bool passByVal(TypeFunction *, Type *t) override {
     t = t->toBasetype();
     return isPOD(t) &&
@@ -51,8 +55,8 @@ struct PPC64LETargetABI : TargetABI {
       } else {
         compositeToArray64.applyTo(arg);
       }
-    } else if (ty->isintegral() && !ty->isTypeVector()) {
-      arg.attrs.addAttribute(ty->isunsigned() ? LLAttribute::ZExt
+    } else if (ty->isIntegral() && !ty->isTypeVector()) {
+      arg.attrs.addAttribute(ty->isUnsigned() ? LLAttribute::ZExt
                                               : LLAttribute::SExt);
     }
   }

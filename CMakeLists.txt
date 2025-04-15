@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.4.3)
+cmake_minimum_required(VERSION 3.16.0)
 if(POLICY CMP0025)
     cmake_policy(SET CMP0025 NEW)
 endif()
@@ -117,9 +117,9 @@ include(GetLinuxDistribution)
 #
 
 # Version information
-set(LDC_VERSION "1.40.1") # May be overridden by git hash tag
+set(LDC_VERSION "1.41.0") # May be overridden by git hash tag
 set(DMDFE_MAJOR_VERSION   2)
-set(DMDFE_MINOR_VERSION   110)
+set(DMDFE_MINOR_VERSION   111)
 set(DMDFE_PATCH_VERSION   0)
 
 set(DMD_VERSION ${DMDFE_MAJOR_VERSION}.${DMDFE_MINOR_VERSION}.${DMDFE_PATCH_VERSION})
@@ -137,7 +137,8 @@ endif()
 set(D_VERSION ${DMDFE_MAJOR_VERSION} CACHE STRING "D language version")
 set(PROGRAM_PREFIX "" CACHE STRING "Prepended to ldc/ldmd binary names")
 set(PROGRAM_SUFFIX "" CACHE STRING "Appended to ldc/ldmd binary names")
-set(CONF_INST_DIR ${SYSCONF_INSTALL_DIR} CACHE PATH "Directory ldc.conf is installed to")
+set(CONF_INST_DIR ${SYSCONF_INSTALL_DIR} CACHE PATH "Directory ldc2.conf is installed to")
+set(INCLUDE_INSTALL_DIR ${CMAKE_INSTALL_PREFIX}/include/d CACHE PATH "Path to install D modules to")
 
 # Note: LIB_SUFFIX should perhaps be renamed to LDC_LIBDIR_SUFFIX.
 set(LIB_SUFFIX "" CACHE STRING "Appended to the library installation directory. Set to '64' to install libraries into ${PREFIX}/lib64.")
@@ -206,17 +207,11 @@ if(MSVC)
         append("-Llegacy_stdio_definitions.lib" DFLAGS_BASE)
     endif()
 
-    # Link against the static MSVC runtime; CMake's C(++) flags apparently default to the dynamic one.
-    # Host DMD/LDMD already defaults to linking against the static MSVC runtime.
-    if(${LLVM_CXXFLAGS} MATCHES "(^| )/MDd?( |$)")
-        message(FATAL_ERROR "LLVM must be built with CMake option LLVM_USE_CRT_<CMAKE_BUILD_TYPE>=MT[d]")
-    endif()
     set(llvm_ob_flag)
     string(REGEX MATCH "/Ob[0-2]" llvm_ob_flag "${LLVM_CXXFLAGS}")
     foreach(flag_var
             CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_RELWITHDEBINFO
             CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_RELWITHDEBINFO)
-        string(REGEX REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}")
         # CMake defaults to /W3, LLVM uses /W4 => MS compiler warns about overridden option.
         # Simply replace with /W4.
         string(REGEX REPLACE "/W[0-3]" "/W4" ${flag_var} "${${flag_var}}")
@@ -413,7 +408,6 @@ set(DRV_HDR
     driver/linker.h
     driver/plugins.h
     driver/targetmachine.h
-    driver/timetrace.h
     driver/toobj.h
     driver/tool.h
 )
@@ -720,7 +714,7 @@ if(MSVC_IDE)
     # the IDE generator is a multi-config one
     # so copy the config file into the correct bin subfolder
     # (different outputs no longer feasible for custom commands, so disabled)
-    #    add_custom_command(TARGET ${LDC_EXE} POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_BINARY_DIR}/bin/${LDC_EXE}.conf $<TARGET_FILE_DIR:${LDC_EXE}> COMMENT "Copy config file ${LDC_EXE}.conf")
+    #    add_custom_command(TARGET ${LDC_EXE} POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_BINARY_DIR}/etc/${LDC_EXE}.conf $<TARGET_FILE_DIR:${LDC_EXE}> COMMENT "Copy config file ${LDC_EXE}.conf")
 endif()
 
 
@@ -910,6 +904,42 @@ endif()
 #
 add_subdirectory(utils)
 
+# auto-generate ldc/gccbuiltins_*.di headers, depending on LLVM version and enabled LLVM backends
+set(GCCBUILTINS "")
+if(TARGET gen_gccbuiltins)
+    file(MAKE_DIRECTORY "${PROJECT_BINARY_DIR}/import/ldc")
+
+    function(gen_gccbuiltins name)
+        set(module "${PROJECT_BINARY_DIR}/import/ldc/gccbuiltins_${name}.di")
+        if (GCCBUILTINS STREQUAL "")
+            set(GCCBUILTINS "${module}" PARENT_SCOPE)
+        else()
+            set(GCCBUILTINS "${GCCBUILTINS};${module}" PARENT_SCOPE)
+        endif()
+        add_custom_command(
+            OUTPUT ${module}
+            COMMAND gen_gccbuiltins ${module} "${name}"
+            DEPENDS gen_gccbuiltins
+        )
+    endfunction()
+
+    set(target_arch "AArch64;AMDGPU;ARM;Mips;RISCV;NVPTX;PowerPC;SystemZ;X86")
+    set(target_name "aarch64;amdgcn;arm;mips;riscv;nvvm;ppc;s390;x86")
+
+    foreach(target ${LLVM_TARGETS_TO_BUILD})
+        list(FIND target_arch ${target} idx)
+        if(idx GREATER -1)
+            list(GET target_name ${idx} name)
+            gen_gccbuiltins(${name})
+        endif()
+    endforeach()
+
+    add_custom_target(gccbuiltins DEPENDS ${GCCBUILTINS})
+
+    # make sure they are generated when building the compiler (as link-time dependency)
+    add_dependencies(${LDC_EXE} gccbuiltins)
+endif()
+
 #
 # Auxiliary tools.
 #
@@ -939,11 +969,18 @@ add_test(NAME build-ldc2-unittest COMMAND "${CMAKE_COMMAND}" --build ${CMAKE_BIN
 add_test(NAME ldc2-unittest COMMAND ${LDC_UNITTEST_EXE_FULL} --version)
 set_tests_properties(ldc2-unittest PROPERTIES DEPENDS build-ldc2-unittest)
 
-if(EXISTS "${PROJECT_SOURCE_DIR}/runtime/druntime/src/object.d")
+set(_LDC_BUILD_RUNTIME_DEFAULT ON)
+if(CMAKE_CROSSCOMPILING)
+    set(_LDC_BUILD_RUNTIME_DEFAULT OFF)
+endif()
+option(LDC_BUILD_RUNTIME "Build the runtime libraries" ${_LDC_BUILD_RUNTIME_DEFAULT})
+
+if(LDC_BUILD_RUNTIME)
     add_subdirectory(runtime)
 else()
-    message(STATUS "Runtime file runtime/druntime/src/object.d not found, will build ldc binaries but not the standard library.")
+    message(STATUS "NOT building the runtime libraries (LDC_BUILD_RUNTIME=OFF)")
 endif()
+
 if(D_VERSION EQUAL 2)
     add_subdirectory(tests/dmd)
 endif()
@@ -978,7 +1015,6 @@ if(${BUILD_SHARED})
     # as well, for the time being this just bloats the normal packages.
     install(TARGETS ${LDC_LIB} DESTINATION ${CMAKE_INSTALL_PREFIX}/lib${LIB_SUFFIX})
 endif()
-install(FILES ${PROJECT_BINARY_DIR}/bin/${LDC_EXE}_install.conf DESTINATION ${CONF_INST_DIR} RENAME ${LDC_EXE}.conf)
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
     if(NOT DEFINED BASH_COMPLETION_COMPLETIONSDIR)
@@ -992,6 +1028,17 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
     endif()
     install(DIRECTORY packaging/bash_completion.d/ DESTINATION ${BASH_COMPLETION_COMPLETIONSDIR})
 endif()
+
+# imports/includes
+install(FILES runtime/druntime/src/object.d runtime/druntime/src/__importc_builtins.di runtime/druntime/src/importc.h DESTINATION ${INCLUDE_INSTALL_DIR})
+foreach(p core etc ldc)
+    install(DIRECTORY runtime/druntime/src/${p} DESTINATION ${INCLUDE_INSTALL_DIR} FILES_MATCHING PATTERN "*.d")
+    install(DIRECTORY runtime/druntime/src/${p} DESTINATION ${INCLUDE_INSTALL_DIR} FILES_MATCHING PATTERN "*.di")
+endforeach()
+install(DIRECTORY runtime/phobos/std DESTINATION ${INCLUDE_INSTALL_DIR} FILES_MATCHING PATTERN "*.d")
+install(DIRECTORY runtime/phobos/etc DESTINATION ${INCLUDE_INSTALL_DIR} FILES_MATCHING PATTERN "*.d")
+install(DIRECTORY runtime/jit-rt/d/ldc DESTINATION ${INCLUDE_INSTALL_DIR} FILES_MATCHING PATTERN "*.d")
+install(FILES ${GCCBUILTINS} DESTINATION ${INCLUDE_INSTALL_DIR}/ldc)
 
 #
 # Packaging
