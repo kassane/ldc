@@ -709,6 +709,10 @@ void registerPredefinedTargetVersions() {
     // No hardware FPU; match AVR.
     VersionCondition::addPredefinedGlobalIdent("D_SoftFloat");
     break;
+  case llvm::Triple::mos:
+    VersionCondition::addPredefinedGlobalIdent("MOS");
+    VersionCondition::addPredefinedGlobalIdent("D_SoftFloat");
+    break;
   case llvm::Triple::riscv32:
     VersionCondition::addPredefinedGlobalIdent("RISCV32");
     VersionCondition::addPredefinedGlobalIdent(

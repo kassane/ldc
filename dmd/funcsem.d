@@ -3340,7 +3340,10 @@ extern (D) void checkMain(FuncDeclaration fd)
     // Allow enums with appropriate base types (same ABI)
     retType = retType.toBasetype();
 
-    if (retType.ty != Tint32 && retType.ty != Tvoid && retType.ty != Tnoreturn)
+    // A C `main` returns the target's C `int`, which is 16-bit (Tint16) on
+    // MOS/MSP430/AVR — accept it in addition to the usual 32-bit `int`.
+    if (retType.ty != Tint32 && retType.ty != Tvoid && retType.ty != Tnoreturn &&
+        !(fd.isCMain() && retType.ty == Tint16))
         .error(fd.loc, "%s `%s` must return `int`, `void` or `noreturn`, not `%s`", fd.kind, fd.toPrettyChars, tf.nextOf().toChars());
 }
 

@@ -94,9 +94,12 @@ llvm::FunctionType *DtoFunctionType(Type *type, IrFuncTy &irFty, Type *thistype,
 
   const bool isMain = fd && isAnyMainFunction(fd);
   if (isMain) {
-    // D and C main functions always return i32, even if declared as returning
-    // void.
-    newIrFty.ret = new IrFuncTyArg(Type::tint32, false);
+    // D main always returns i32, even if declared void. A C main returns the
+    // target's C `int`, which is 16-bit on MOS/MSP430/AVR (matches clang and the
+    // C startup code); forcing i32 there produces broken IR (i32 return vs i16 body).
+    Type *mainRet = (fd->isCMain() && target.c.intsize == 2) ? Type::tint16
+                                                             : Type::tint32;
+    newIrFty.ret = new IrFuncTyArg(mainRet, false);
   } else {
     Type *rt = f->next;
     const bool byref = f->isRef() && rt->toBasetype()->ty != TY::Tvoid;

@@ -302,6 +302,8 @@ TargetABI *TargetABI::getTarget() {
   case llvm::Triple::wasm32:
   case llvm::Triple::wasm64:
     return getWasmTargetABI();
+  case llvm::Triple::mos:
+    return getMOSTargetABI();
   default:
     warning(Loc(),
             "unknown target ABI, falling back to generic implementation. C/C++ "

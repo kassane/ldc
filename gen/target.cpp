@@ -166,7 +166,18 @@ void Target::_init(const Param &params) {
   c.crtDestructorsSupported = true; // unused as of 2.099
   c.boolsize = 1;
   c.shortsize = 2;
-  c.intsize = 4;
+  // MOS 6502 / MSP430 / AVR use a 16-bit C `int`; all other targets use 32-bit.
+  // Matches clang/llvm-mos so ImportC struct layouts and `size_t` agree across FFI.
+  switch (triple.getArch()) {
+  case llvm::Triple::mos:
+  case llvm::Triple::msp430:
+  case llvm::Triple::avr:
+    c.intsize = 2;
+    break;
+  default:
+    c.intsize = 4;
+    break;
+  }
   c.longsize = (ptrsize == 8) && !isMSVC ? 8 : 4;
   c.long_longsize = 8;
   c.long_doublesize = realsize;

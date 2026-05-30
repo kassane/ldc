@@ -1327,10 +1327,26 @@ void Type_init()
     Type.twstring = Type.twchar.immutableOf().arrayOf();
     Type.tdstring = Type.tdchar.immutableOf().arrayOf();
 
-    const isLP64 = target.isLP64;
-
-    Type.tsize_t    = Type.basic[isLP64 ? Tuns64 : Tuns32];
-    Type.tptrdiff_t = Type.basic[isLP64 ? Tint64 : Tint32];
+    // size_t/ptrdiff_t track the target's actual pointer width, not just
+    // isLP64.  16-bit-pointer targets (MOS 6502, MSP430, AVR) need a 16-bit
+    // size_t; otherwise aggregate/array length fields are emitted as i32 on
+    // an i16 target.
+    switch (target.ptrsize)
+    {
+        case 8:
+            Type.tsize_t    = Type.basic[Tuns64];
+            Type.tptrdiff_t = Type.basic[Tint64];
+            break;
+        case 2:
+            Type.tsize_t    = Type.basic[Tuns16];
+            Type.tptrdiff_t = Type.basic[Tint16];
+            break;
+        case 4:
+        default:
+            Type.tsize_t    = Type.basic[Tuns32];
+            Type.tptrdiff_t = Type.basic[Tint32];
+            break;
+    }
     Type.thash_t = Type.tsize_t;
 
     static if (__VERSION__ == 2081)
@@ -3858,6 +3874,18 @@ Type typeSemantic(Type type, Loc loc, Scope* sc)
             }
             else
             {
+                // `__LINE__` is typed `int`.  On sub-32-bit targets
+                // (MOS 6502 / MSP430 / AVR) a parameter like `size_t line =
+                // __LINE__` needs an int->16-bit narrowing that the implicit
+                // conversion check rejects, even though line numbers are
+                // bounded.  Make the conversion explicit there; mainstream
+                // targets are byte-for-byte unaffected.  CastExp is a UnaExp,
+                // so resolveLoc still substitutes the call-site line later.
+                if (target.ptrsize < 4 && fparam.type.isIntegral())
+                {
+                    if (auto lie = e.isLineInitExp())
+                        e = new CastExp(e.loc, lie, fparam.type);
+                }
                 e = inferType(e, fparam.type);
                 Scope* sc2 = sc.push();
                 sc2.inDefaultArg = true;
