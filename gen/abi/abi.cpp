@@ -24,6 +24,7 @@
 #include "gen/tollvm.h"
 #include "ir/irfunction.h"
 #include "ir/irfuncty.h"
+#include "llvm/Target/TargetMachine.h"
 #include <algorithm>
 
 using namespace dmd;
@@ -278,8 +279,31 @@ TargetABI *TargetABI::getTarget() {
   case llvm::Triple::mips64:
   case llvm::Triple::mips64el:
     return getMIPS64TargetABI(global.params.targetTriple->isArch64Bit());
-  case llvm::Triple::riscv64:
-    return getRISCV64TargetABI();
+  case llvm::Triple::riscv32:
+  case llvm::Triple::riscv64: {
+    const unsigned XLen =
+        global.params.targetTriple->isArch64Bit() ? 64 : 32;
+    // FLen = hardware-float ABI width. Prefer the explicit -mabi name
+    // (ilp32d/lp64d -> 64, ilp32f/lp64f -> 32, else soft); otherwise infer
+    // from the ISA's float extensions so rv64gc stays hard-float and a
+    // soft-float rv32imc (ESP32-C3/C6) stays soft.
+    unsigned FLen = 0;
+    if (gTargetMachine) {
+      llvm::StringRef abi(gTargetMachine->Options.MCOptions.ABIName);
+      if (abi.ends_with("d")) {
+        FLen = 64;
+      } else if (abi.ends_with("f")) {
+        FLen = 32;
+      } else if (abi.empty()) {
+        llvm::StringRef feats(gTargetMachine->getTargetFeatureString());
+        if (feats.contains("+d"))
+          FLen = 64;
+        else if (feats.contains("+f"))
+          FLen = 32;
+      }
+    }
+    return getRISCVTargetABI(XLen, FLen);
+  }
   case llvm::Triple::ppc:
     return getPPCTargetABI(false);
   case llvm::Triple::ppc64:
@@ -302,6 +326,8 @@ TargetABI *TargetABI::getTarget() {
   case llvm::Triple::wasm32:
   case llvm::Triple::wasm64:
     return getWasmTargetABI();
+  case llvm::Triple::xtensa:
+    return getXtensaTargetABI();
   default:
     warning(Loc(),
             "unknown target ABI, falling back to generic implementation. C/C++ "

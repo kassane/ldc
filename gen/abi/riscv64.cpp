@@ -1,4 +1,4 @@
-//===-- gen/abi-riscv64.cpp - RISCV64 ABI description -----------*- C++ -*-===//
+//===-- gen/abi/riscv64.cpp - RISCV ABI description -------------*- C++ -*-===//
 //
 //                         LDC – the LLVM D compiler
 //
@@ -9,6 +9,10 @@
 //
 // ABI spec:
 // https://github.com/riscv-non-isa/riscv-elf-psabi-doc/blob/master/riscv-cc.adoc
+//
+// Parameterized by XLen (32 for rv32 / ESP32-C3/C6/P4, 64 for rv64) and FLen
+// (the ABI float width: 0 soft / ilp32 / lp64, 32 ilp32f / lp64f, 64 ilp32d /
+// lp64d). Hardware-float struct flattening (FPCC) only applies when FLen != 0.
 //
 //===----------------------------------------------------------------------===//
 
@@ -22,10 +26,14 @@
 using namespace dmd;
 
 namespace {
-struct Integer2Rewrite : BaseBitcastABIRewrite {
+// Bit-casts an aggregate to a pair of XLen-wide integers (e.g. {i32,i32} on
+// rv32, {i64,i64} on rv64) to avoid mis-alignment of the integer coercion.
+struct IntegerPairRewrite : BaseBitcastABIRewrite {
+  const unsigned xlenBits;
+  explicit IntegerPairRewrite(unsigned xlenBits) : xlenBits(xlenBits) {}
   LLType *type(Type *t) override {
-    return LLStructType::get(gIR->context(),
-                             {DtoType(Type::tint64), DtoType(Type::tint64)});
+    auto *i = LLIntegerType::get(gIR->context(), xlenBits);
+    return LLStructType::get(gIR->context(), {i, i});
   }
 };
 
@@ -35,18 +43,20 @@ struct FlattenedFields {
     unsigned offset = 0;
   };
   FlattenedField fields[2];
-  int length = 0; // use -1 to represent "no need to rewrite" condition
+  int length = 0; // use -1 to represent "not FPCC-eligible"
 };
 
-FlattenedFields visitStructFields(Type *ty, unsigned baseOffset) {
-  // recursively visit a POD struct to flatten it
-  // FIXME: may cause low performance
-  // dmd may cache argtypes in some other architectures as a TypeTuple, but we
-  // need to additionally store field offsets to realign later
+// Recursively flatten a POD struct into at most 2 FPCC-eligible fields.
+// A field is eligible only if it fits the ABI register width: a float must be
+// <= FLen, an integer/pointer must be <= XLen. Otherwise the struct is not
+// hardware-float eligible (length = -1) and uses the integer ABI.
+FlattenedFields visitStructFields(Type *ty, unsigned baseOffset, unsigned XLen,
+                                  unsigned FLen) {
   FlattenedFields result;
   if (auto ts = ty->toBasetype()->isTypeStruct()) {
     for (auto fi : ts->sym->fields) {
-      auto sub = visitStructFields(fi->type, baseOffset + fi->offset);
+      auto sub =
+          visitStructFields(fi->type, baseOffset + fi->offset, XLen, FLen);
       if (sub.length == -1 || result.length + sub.length > 2) {
         result.length = -1;
         return result;
@@ -58,38 +68,52 @@ FlattenedFields visitStructFields(Type *ty, unsigned baseOffset) {
     return result;
   }
   switch (ty->toBasetype()->ty) {
-  case TY::Tcomplex32: // treat it as {float32, float32}
+  case TY::Tcomplex32: // {float32, float32}
+    if (FLen < 32) {
+      result.length = -1;
+      break;
+    }
     result.fields[0].ty = pointerTo(Type::tfloat32);
     result.fields[1].ty = pointerTo(Type::tfloat32);
     result.fields[0].offset = baseOffset;
     result.fields[1].offset = baseOffset + 4;
     result.length = 2;
     break;
-  case TY::Tcomplex64: // treat it as {float64, float64}
+  case TY::Tcomplex64: // {float64, float64}
+    if (FLen < 64) {
+      result.length = -1;
+      break;
+    }
     result.fields[0].ty = pointerTo(Type::tfloat64);
     result.fields[1].ty = pointerTo(Type::tfloat64);
     result.fields[0].offset = baseOffset;
     result.fields[1].offset = baseOffset + 8;
     result.length = 2;
     break;
-  default:
-    if (size(ty->toBasetype()) > 8) {
-      // field larger than XLEN and FLEN
+  default: {
+    Type *bt = ty->toBasetype();
+    const auto bits = size(bt) * 8;
+    const bool isFloat = bt->isFloating();
+    // float must fit FLen; integer/pointer must fit XLen.
+    if (isFloat ? (FLen == 0 || bits > FLen) : (bits > XLen)) {
       result.length = -1;
       break;
     }
-    result.fields[0].ty = ty->toBasetype();
+    result.fields[0].ty = bt;
     result.fields[0].offset = baseOffset;
     result.length = 1;
     break;
   }
+  }
   return result;
 }
 
-bool requireHardfloatRewrite(Type *ty) {
+bool requireHardfloatRewrite(Type *ty, unsigned XLen, unsigned FLen) {
+  if (FLen == 0) // soft-float ABI: no FPCC struct flattening
+    return false;
   if (!ty->toBasetype()->isTypeStruct())
     return false;
-  auto result = visitStructFields(ty, 0);
+  auto result = visitStructFields(ty, 0, XLen, FLen);
   if (result.length <= 0)
     return false;
   if (result.length == 1)
@@ -98,10 +122,12 @@ bool requireHardfloatRewrite(Type *ty) {
 }
 
 struct HardfloatRewrite : ABIRewrite {
+  const unsigned XLen;
+  const unsigned FLen;
+  HardfloatRewrite(unsigned XLen, unsigned FLen) : XLen(XLen), FLen(FLen) {}
   LLValue *put(DValue *dv, bool, bool) override {
     // realign fields
-    // FIXME: no need to alloc an extra buffer in many conditions
-    const auto flat = visitStructFields(dv->type, 0);
+    const auto flat = visitStructFields(dv->type, 0, XLen, FLen);
     LLType *asType = type(dv->type, flat);
     const unsigned alignment = getABITypeAlign(asType);
     assert(dv->isLVal());
@@ -117,7 +143,7 @@ struct HardfloatRewrite : ABIRewrite {
   }
   LLValue *getLVal(Type *dty, LLValue *v) override {
     // inverse operation of method "put"
-    const auto flat = visitStructFields(dty, 0);
+    const auto flat = visitStructFields(dty, 0, XLen, FLen);
     LLType *asType = type(dty, flat);
     const unsigned alignment = DtoAlignment(dty);
     LLValue *buffer = DtoAllocaDump(v, asType, getABITypeAlign(asType),
@@ -146,21 +172,32 @@ struct HardfloatRewrite : ABIRewrite {
     }
     return LLStructType::get(gIR->context(), {t[0], t[1]}, false);
   }
-  LLType *type(Type *ty) override { return type(ty, visitStructFields(ty, 0)); }
+  LLType *type(Type *ty) override {
+    return type(ty, visitStructFields(ty, 0, XLen, FLen));
+  }
 };
 } // anonymous namespace
 
-struct RISCV64TargetABI : TargetABI {
+struct RISCVTargetABI : TargetABI {
 private:
+  const unsigned XLen;  // 32 or 64 (bits)
+  const unsigned FLen;  // 0 (soft), 32 (f), 64 (d)
   HardfloatRewrite hardfloatRewrite;
   IndirectByvalRewrite indirectByvalRewrite;
-  Integer2Rewrite integer2Rewrite;
+  IntegerPairRewrite integerPairRewrite;
   IntegerRewrite integerRewrite;
 
+  // 2 registers' worth of bytes — the largest aggregate passed in registers.
+  unsigned maxRegBytes() const { return 2 * XLen / 8; }
+
 public:
+  RISCVTargetABI(unsigned XLen, unsigned FLen)
+      : XLen(XLen), FLen(FLen), hardfloatRewrite(XLen, FLen),
+        integerPairRewrite(XLen) {}
+
   llvm::UWTableKind defaultUnwindTableKind() override {
     return global.params.targetTriple->isOSLinux() ? llvm::UWTableKind::Async
-                                                   : llvm::UWTableKind::None;
+                                                    : llvm::UWTableKind::None;
   }
 
   Type *vaListType() override {
@@ -169,7 +206,7 @@ public:
   }
   bool returnInArg(TypeFunction *tf, bool) override {
     Type *rt = tf->next->toBasetype();
-    return !isPOD(rt) || size(rt) > 16;
+    return !isPOD(rt) || size(rt) > maxRegBytes();
   }
   bool passByVal(TypeFunction *, Type *t) override {
     t = t->toBasetype();
@@ -177,7 +214,7 @@ public:
       // rewrite it later to bypass the RVal problem
       return false;
     }
-    return isPOD(t) && size(t) > 16;
+    return isPOD(t) && size(t) > maxRegBytes();
   }
 
   void rewriteVarargs(IrFuncTy &fty,
@@ -197,7 +234,7 @@ public:
     if (arg.rewrite)
       return;
 
-    if (!isVararg && requireHardfloatRewrite(arg.type)) {
+    if (!isVararg && requireHardfloatRewrite(arg.type, XLen, FLen)) {
       hardfloatRewrite.applyTo(arg);
       return;
     }
@@ -209,16 +246,22 @@ public:
       return;
     }
 
-    if (isAggregate(ty) && size(ty) && size(ty) <= 16) {
-      if (size(ty) > 8 && DtoAlignment(ty) < 16) {
-        // pass the aggregate as {int64, int64} to avoid wrong alignment
-        integer2Rewrite.applyToIfNotObsolete(arg);
+    const unsigned xbytes = XLen / 8;
+    if (isAggregate(ty) && size(ty) && size(ty) <= maxRegBytes()) {
+      // Force the coercion (not applyToIfNotObsolete): on rv32 an align-4
+      // {i32,i32} is memory-equivalent to the source struct and would be left
+      // raw, but clang/the psABI want the explicit coerced type (and the raw
+      // form is unreliable for under-aligned aggregates).
+      if (size(ty) > xbytes && DtoAlignment(ty) < 2 * xbytes) {
+        integerPairRewrite.applyTo(arg); // {iXLen, iXLen}
       } else {
-        integerRewrite.applyToIfNotObsolete(arg);
+        integerRewrite.applyTo(arg);
       }
     }
   }
 };
 
-// The public getter for abi.cpp
-TargetABI *getRISCV64TargetABI() { return new RISCV64TargetABI(); }
+// The public getter for abi.cpp.
+TargetABI *getRISCVTargetABI(unsigned XLen, unsigned FLen) {
+  return new RISCVTargetABI(XLen, FLen);
+}

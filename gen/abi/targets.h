@@ -27,7 +27,7 @@ TargetABI *getPPCTargetABI(bool Is64Bit);
 
 TargetABI *getPPC64LETargetABI();
 
-TargetABI *getRISCV64TargetABI();
+TargetABI *getRISCVTargetABI(unsigned XLen, unsigned FLen);
 
 TargetABI *createSPIRVABI();
 
@@ -40,3 +40,5 @@ TargetABI *getX86TargetABI();
 TargetABI *getLoongArch64TargetABI();
 
 TargetABI *getWasmTargetABI();
+
+TargetABI *getXtensaTargetABI();
